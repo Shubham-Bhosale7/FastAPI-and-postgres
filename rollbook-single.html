@@ -1,0 +1,946 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rollbook · Student records</title>
+  <script>
+    // Apply the saved theme before paint to avoid a flash
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem("rollbook-theme"); } catch (e) {}
+      if (!t) t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.dataset.theme = t;
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&family=Instrument+Serif&display=swap" rel="stylesheet" />
+  <style>
+/* Rollbook: design tokens first, then base, layout and components */
+:root {
+  --bg: #f5f6fa; --surface: #ffffff; --surface-2: #f0f2f8;
+  --ink: #101426; --ink-2: #4a5270; --ink-3: #7a829d; --line: #e2e5ee;
+  --brand: #2a3fd6; --brand-ink: #ffffff; --brand-hover: #2133b8;
+  --danger: #c8372d;
+  --g-ap: #b7791f; --g-a: #1e8e5a; --g-b: #2a6fdb; --g-c: #c26a1b; --g-f: #c8372d;
+  --av-l: 38%;
+  --shadow: 0 1px 2px rgb(16 20 38 / .05), 0 12px 32px -16px rgb(16 20 38 / .18);
+  --serif: "Instrument Serif", Georgia, serif;
+  --sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #0b0e19; --surface: #131828; --surface-2: #1a2036;
+  --ink: #eef0f8; --ink-2: #aab1cc; --ink-3: #7c84a3; --line: #252c45;
+  --brand: #8392ff; --brand-ink: #0b0e19; --brand-hover: #a0acff;
+  --danger: #ff8a80;
+  --g-ap: #f2c46b; --g-a: #5bd69a; --g-b: #7fb0ff; --g-c: #ffa95c; --g-f: #ff8a80;
+  --av-l: 74%;
+  --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 12px 32px -16px rgb(0 0 0 / .6);
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+h1, h2, h3, p { margin: 0; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.muted { color: var(--ink-3); }
+.fine { font-size: 13px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- top bar ---------- */
+.topbar { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
+.topbar-inner { max-width: 1120px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: -.01em; margin-right: auto; }
+.mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: var(--ink); color: var(--bg); font: 400 21px/1 var(--serif); }
+
+.lookup { display: flex; align-items: center; gap: 8px; width: 260px; height: 38px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink-3); }
+.lookup:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent); }
+.lookup input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--ink); }
+kbd { font: 12px var(--sans); padding: 1px 7px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink-3); }
+
+/* ---------- buttons ---------- */
+.btn { height: 38px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font-weight: 550; transition: background .15s, border-color .15s; }
+.btn:hover:not(:disabled) { background: var(--surface-2); }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.btn.primary:hover:not(:disabled) { background: var(--brand-hover); border-color: var(--brand-hover); }
+.btn.ghost { background: transparent; }
+.btn.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+:root[data-theme="dark"] .btn.danger { color: #1a0a09; }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+.icon-btn { display: inline-grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 9px; background: none; color: var(--ink-2); }
+.icon-btn:hover { background: var(--surface-2); color: var(--ink); }
+.icon-btn.danger:hover { color: var(--danger); }
+.i-moon { display: none; }
+:root[data-theme="dark"] .i-sun { display: none; }
+:root[data-theme="dark"] .i-moon { display: block; }
+
+/* ---------- page ---------- */
+main { max-width: 1120px; margin: 0 auto; padding: 40px 24px 72px; }
+.intro { margin-bottom: 28px; }
+.intro h1 { font: 400 clamp(2.4rem, 5vw, 3.6rem)/1.05 var(--serif); letter-spacing: -.015em; }
+.intro p { margin-top: 8px; font-size: 16px; }
+
+.overview { display: grid; grid-template-columns: repeat(3, auto) minmax(260px, 1fr); gap: 20px 48px; padding: 24px 28px; margin-bottom: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+.stat { display: flex; flex-direction: column; }
+.stat-num { font: 400 2.75rem/1.05 var(--serif); letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.spread { display: flex; flex-direction: column; gap: 10px; justify-content: center; }
+.bar { display: flex; gap: 3px; height: 14px; }
+.bar i { border-radius: 99px; background: var(--g); min-width: 8px; }
+.bar.empty { background: var(--surface-2); border-radius: 99px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0; padding: 0; list-style: none; font-size: 13px; color: var(--ink-2); }
+.legend li { display: flex; align-items: center; gap: 6px; }
+.legend b { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--g); }
+
+/* grade colour hooks */
+.g-ap { --g: var(--g-ap); } .g-a { --g: var(--g-a); } .g-b { --g: var(--g-b); } .g-c { --g: var(--g-c); } .g-f { --g: var(--g-f); }
+.grade { display: inline-flex; justify-content: center; min-width: 40px; padding: 3px 11px; border-radius: 99px; font-weight: 650; font-size: 13.5px; color: var(--ink-3); background: var(--surface-2); }
+.grade[class*="g-"] { color: var(--g); background: color-mix(in srgb, var(--g) 14%, transparent); }
+
+/* ---------- lookup result ---------- */
+.found { display: flex; align-items: center; gap: 14px; padding: 14px 18px; margin-bottom: 20px; background: var(--surface); border: 1px solid var(--brand); border-radius: 14px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 10%, transparent); }
+.found-main { flex: 1; min-width: 0; }
+
+/* ---------- table panel ---------- */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; padding: 16px 20px; }
+.toolbar-end { display: flex; gap: 12px; flex-wrap: wrap; }
+.search, .select { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink-3); }
+.search { width: min(320px, 100%); }
+.search:focus-within, .select:focus-within { border-color: var(--brand); }
+.search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--ink); }
+.select select { border: 0; outline: 0; background: none; color: var(--ink); padding-right: 4px; cursor: pointer; }
+.select select option { background: var(--surface); color: var(--ink); }
+
+.table-wrap { overflow-x: auto; transition: opacity .15s; }
+.table-wrap.is-loading { opacity: .55; pointer-events: none; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-weight: 550; font-size: 13px; color: var(--ink-3); padding: 10px 20px; border-top: 1px solid var(--line); background: var(--surface); white-space: nowrap; }
+td { padding: 14px 20px; border-top: 1px solid var(--line); vertical-align: middle; font-variant-numeric: tabular-nums; }
+tbody tr:hover { background: var(--surface-2); }
+.th-btn { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; font: inherit; color: inherit; }
+.th-btn:hover { color: var(--ink); }
+.caret { width: 8px; height: 10px; opacity: .35; background: currentColor; clip-path: polygon(50% 0, 100% 40%, 0 40%, 0 60%, 100% 60%, 50% 100%); }
+th[aria-sort="ascending"] .caret { opacity: 1; clip-path: polygon(50% 0, 100% 70%, 0 70%); color: var(--brand); }
+th[aria-sort="descending"] .caret { opacity: 1; clip-path: polygon(0 30%, 100% 30%, 50% 100%); color: var(--brand); }
+th[aria-sort]:not([aria-sort="none"]) { color: var(--ink); }
+
+.person { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.name { font-weight: 600; }
+.email { font-size: 13px; color: var(--ink-3); }
+.avatar { display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 50%; font-size: 13px; font-weight: 650; background: hsl(var(--h) 70% 55% / .16); color: hsl(var(--h) 55% var(--av-l)); }
+.avatar.lg { width: 46px; height: 46px; font-size: 15px; }
+.marks { display: flex; align-items: center; gap: 10px; }
+.marks > span:first-child { width: 2.2ch; font-weight: 600; }
+.meter { width: 72px; height: 5px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.meter i { display: block; height: 100%; border-radius: 99px; background: var(--g); }
+.col-act { width: 1%; text-align: right; }
+.row-actions { display: flex; justify-content: flex-end; gap: 2px; opacity: 0; transition: opacity .12s; }
+tr:hover .row-actions, tr:focus-within .row-actions { opacity: 1; }
+@media (hover: none) { .row-actions { opacity: 1; } }
+
+.state { display: grid; justify-items: center; gap: 6px; padding: 56px 16px; text-align: center; }
+.state h3 { font: 400 1.6rem/1.2 var(--serif); }
+.state .btn { margin-top: 12px; }
+
+.sk { display: block; height: 11px; margin: 6px 0; border-radius: 6px; background: linear-gradient(90deg, var(--surface-2), var(--line), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+.avatar.sk { width: 38px; height: 38px; border-radius: 50%; margin: 0; }
+.w30 { width: 30px; } .w40 { width: 56px; } .w60 { width: 110px; } .grow { flex: 1; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 14px 20px; border-top: 1px solid var(--line); }
+.pager:empty { display: none; }
+.pages { display: flex; align-items: center; gap: 4px; }
+.pg { display: inline-grid; place-items: center; min-width: 34px; height: 34px; padding: 0 8px; border: 0; border-radius: 9px; background: none; color: var(--ink-2); font-weight: 550; }
+.pg:hover:not(:disabled):not(.on) { background: var(--surface-2); }
+.pg.on { background: var(--ink); color: var(--bg); }
+.pg:disabled { opacity: .35; cursor: not-allowed; }
+.gap { padding: 0 4px; color: var(--ink-3); }
+
+/* ---------- drawer ---------- */
+dialog { padding: 0; border: 0; color: var(--ink); background: var(--surface); }
+dialog::backdrop { background: rgb(8 10 20 / .5); backdrop-filter: blur(3px); }
+.drawer { width: min(460px, 100%); max-width: none; height: 100dvh; max-height: none; margin: 0 0 0 auto; box-shadow: -20px 0 60px -20px rgb(0 0 0 / .35); }
+.drawer[open] { animation: slide-in .26s cubic-bezier(.2, .8, .2, 1); }
+@keyframes slide-in { from { transform: translateX(32px); opacity: 0; } }
+.drawer form { display: flex; flex-direction: column; height: 100%; }
+.drawer-head, .drawer-foot { display: flex; align-items: center; gap: 10px; padding: 18px 24px; }
+.drawer-head { justify-content: space-between; border-bottom: 1px solid var(--line); }
+.drawer-head h2 { font: 400 1.8rem/1.1 var(--serif); }
+.drawer-body { flex: 1; overflow-y: auto; padding: 24px; display: grid; gap: 20px; align-content: start; }
+.drawer-foot { border-top: 1px solid var(--line); }
+.spacer { flex: 1; }
+.preview { display: flex; align-items: center; gap: 8px; }
+.field { display: grid; gap: 6px; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.field label { font-weight: 550; font-size: 14px; }
+.field input { height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink); width: 100%; }
+.field input:focus { outline: 0; border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent); }
+.field input:disabled { opacity: .6; }
+.hint { font-size: 13px; color: var(--ink-3); }
+.err { font-size: 13px; color: var(--danger); display: none; }
+.field.invalid .err { display: block; }
+.field.invalid .hint { display: none; }
+.field.invalid input { border-color: var(--danger); }
+
+/* ---------- confirm dialog ---------- */
+.confirm { width: min(420px, calc(100% - 32px)); margin: auto; padding: 24px; border-radius: 16px; box-shadow: var(--shadow); }
+.confirm h2 { font: 400 1.7rem/1.1 var(--serif); margin-bottom: 8px; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
+.confirm[open] { animation: pop .18s ease-out; }
+@keyframes pop { from { transform: scale(.97); opacity: 0; } }
+
+/* ---------- toasts ---------- */
+.toasts { position: fixed; left: 50%; bottom: 24px; z-index: 50; display: grid; gap: 8px; transform: translateX(-50%); width: min(420px, calc(100% - 32px)); pointer-events: none; }
+.toast { padding: 12px 16px; border-radius: 12px; background: var(--ink); color: var(--bg); font-weight: 500; box-shadow: var(--shadow); animation: pop .2s ease-out; }
+.toast.error { background: var(--danger); color: #fff; }
+:root[data-theme="dark"] .toast.error { color: #1a0a09; }
+
+/* ---------- responsive ---------- */
+@media (max-width: 900px) {
+  .overview { grid-template-columns: repeat(3, 1fr); }
+  .spread { grid-column: 1 / -1; }
+  .col-course, .col-age { display: none; }
+}
+@media (max-width: 640px) {
+  .topbar-inner { flex-wrap: wrap; padding: 10px 16px; }
+  .lookup { order: 5; width: 100%; }
+  main { padding: 28px 16px 56px; }
+  .overview { padding: 18px; gap: 16px 20px; }
+  .stat-num { font-size: 2.1rem; }
+  .col-id, .meter { display: none; }
+  .toolbar, th, td, .pager { padding-left: 14px; padding-right: 14px; }
+  .field-row { grid-template-columns: 1fr; }
+  kbd { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand"><span class="mark" aria-hidden="true">R</span>Rollbook</div>
+
+      <form id="lookup" class="lookup" role="search">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5"/><path d="m13.5 13.5 3.5 3.5"/></svg>
+        <input id="lookupInput" type="text" placeholder="Find a student by id" aria-label="Find a student by id" autocomplete="off" />
+        <kbd aria-hidden="true">/</kbd>
+      </form>
+
+      <button id="themeBtn" class="icon-btn" type="button" aria-label="Switch colour theme">
+        <svg class="i-sun" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.5"/><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4"/></svg>
+        <svg class="i-moon" viewBox="0 0 20 20" aria-hidden="true"><path d="M16.5 11.8A6.8 6.8 0 0 1 8.2 3.5a6.8 6.8 0 1 0 8.3 8.3Z"/></svg>
+      </button>
+      <button id="addBtn" class="btn primary" type="button">Add student</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="intro">
+      <h1>Student records</h1>
+      <p id="introSub" class="muted">Loading the roll…</p>
+    </section>
+
+    <div id="found"></div>
+    <section id="overview" class="overview" aria-label="Overview"></section>
+
+    <section class="panel">
+      <div class="toolbar">
+        <label class="search">
+          <span class="sr-only">Filter by course</span>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M6 10h8M9 15h2"/></svg>
+          <input id="courseInput" type="search" placeholder="Filter by course" autocomplete="off" />
+        </label>
+        <div class="toolbar-end">
+          <label class="select">
+            <span class="muted">Sort</span>
+            <select id="sortSelect">
+              <option value="">Id</option>
+              <option value="name:asc">Name, A to Z</option>
+              <option value="name:desc">Name, Z to A</option>
+              <option value="marks:desc">Marks, high to low</option>
+              <option value="marks:asc">Marks, low to high</option>
+              <option value="age:asc">Age, youngest first</option>
+              <option value="age:desc">Age, oldest first</option>
+            </select>
+          </label>
+          <label class="select">
+            <span class="muted">Show</span>
+            <select id="limitSelect">
+              <option>5</option><option selected>10</option><option>25</option><option>50</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div id="tableWrap" class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col" data-th="name"><button class="th-btn" data-sort="name" type="button">Student<i class="caret"></i></button></th>
+              <th scope="col" class="col-id">Id</th>
+              <th scope="col" class="col-course">Course</th>
+              <th scope="col" class="col-age" data-th="age"><button class="th-btn" data-sort="age" type="button">Age<i class="caret"></i></button></th>
+              <th scope="col" data-th="marks"><button class="th-btn" data-sort="marks" type="button">Marks<i class="caret"></i></button></th>
+              <th scope="col">Grade</th>
+              <th scope="col" class="col-act"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <nav id="pager" class="pager" aria-label="Pagination"></nav>
+    </section>
+  </main>
+
+  <!-- Add / edit drawer -->
+  <dialog id="drawer" class="drawer" aria-labelledby="drawerTitle">
+    <form id="studentForm" novalidate>
+      <header class="drawer-head">
+        <h2 id="drawerTitle">Add student</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
+        </button>
+      </header>
+
+      <div class="drawer-body">
+        <div class="field" data-field="id">
+          <label for="f-id">Student id</label>
+          <input id="f-id" type="text" placeholder="S001" autocomplete="off" />
+          <p class="err" role="alert"></p>
+        </div>
+        <div class="field" data-field="name">
+          <label for="f-name">Full name</label>
+          <input id="f-name" type="text" placeholder="Annaya Iyer" autocomplete="off" />
+          <p class="hint">Letters and spaces only.</p><p class="err" role="alert"></p>
+        </div>
+        <div class="field-row">
+          <div class="field" data-field="age">
+            <label for="f-age">Age</label>
+            <input id="f-age" type="number" inputmode="numeric" placeholder="20" />
+            <p class="err" role="alert"></p>
+          </div>
+          <div class="field" data-field="marks">
+            <label for="f-marks">Marks</label>
+            <input id="f-marks" type="number" inputmode="numeric" placeholder="0 to 100" />
+            <p class="err" role="alert"></p>
+          </div>
+        </div>
+        <div class="field" data-field="course">
+          <label for="f-course">Course</label>
+          <input id="f-course" type="text" placeholder="Python" autocomplete="off" />
+          <p class="err" role="alert"></p>
+        </div>
+        <div class="field" data-field="email">
+          <label for="f-email">Email</label>
+          <input id="f-email" type="email" placeholder="annaya@example.com" autocomplete="off" />
+          <p class="err" role="alert"></p>
+        </div>
+      </div>
+
+      <footer class="drawer-foot">
+        <span class="preview muted">Grade <b id="gradePreview" class="grade">–</b></span>
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost" data-close>Cancel</button>
+        <button type="submit" id="saveBtn" class="btn primary">Create student</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- Delete confirmation -->
+  <dialog id="confirm" class="confirm" aria-labelledby="confirmTitle">
+    <form method="dialog">
+      <h2 id="confirmTitle">Delete student?</h2>
+      <p id="confirmText" class="muted"></p>
+      <div class="confirm-actions">
+        <button class="btn ghost" value="cancel">Keep student</button>
+        <button class="btn danger" value="ok" id="confirmOk">Delete student</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+  <script>
+/* API layer: one function per FastAPI route in main.py */
+const Api = (() => {
+  // Change this (or set window.ROLLBOOK_API_URL before this script) if the backend runs elsewhere
+  const BASE = window.ROLLBOOK_API_URL || "http://127.0.0.1:8000";
+
+  class ApiError extends Error {
+    constructor(message, status, fields) {
+      super(message);
+      this.status = status;
+      this.fields = fields || null; // { fieldName: message } from Pydantic 422 errors
+    }
+  }
+
+  function parseError(body, status) {
+    const detail = body && body.detail;
+    if (typeof detail === "string") return new ApiError(detail, status);
+    if (Array.isArray(detail)) {
+      const fields = {};
+      detail.forEach((e) => {
+        const key = e.loc[e.loc.length - 1];
+        if (!fields[key]) fields[key] = e.msg.replace(/^Value error, /, "");
+      });
+      return new ApiError("Some fields need attention.", status, fields);
+    }
+    return new ApiError(`Request failed (${status}).`, status);
+  }
+
+  async function request(path, options = {}) {
+    let res;
+    try {
+      res = await fetch(BASE + path, {
+        headers: { "Content-Type": "application/json" },
+        ...options,
+      });
+    } catch (err) {
+      if (err.name === "AbortError") throw err;
+      throw new ApiError("Can't reach the API. Check that the server is running on " + BASE + ".", 0);
+    }
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw parseError(body, res.status);
+    return body;
+  }
+
+  const enc = encodeURIComponent;
+
+  return {
+    // GET /students?course=&sort_by=&order=&page=&limit=
+    list(params, signal) {
+      const q = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") q.set(k, v);
+      });
+      return request(`/students?${q}`, { signal });
+    },
+    get: (id) => request(`/student/${enc(id)}`),
+    create: (student) => request("/CreateStudent", { method: "POST", body: JSON.stringify(student) }),
+    update: (id, changes) => request(`/UpdateStudent/${enc(id)}`, { method: "PUT", body: JSON.stringify(changes) }),
+    remove: (id) => request(`/DeleteStudent/${enc(id)}`, { method: "DELETE" }),
+  };
+})();
+
+/* Client-side mirror of the Pydantic rules in main.py (StudentCreate / StudentUpdate / grade) */
+const Validation = (() => {
+  const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const gradeFor = (m) => (m >= 90 ? "A+" : m >= 80 ? "A" : m >= 70 ? "B" : m >= 60 ? "C" : "F");
+  const gradeKey = (g) => ({ "A+": "ap", A: "a", B: "b", C: "c", F: "f" })[g];
+
+  // Python str.title()
+  const titleCase = (s) =>
+    s.toLowerCase().replace(/(^|[^\p{L}])(\p{L})/gu, (_, a, b) => a + b.toUpperCase());
+
+  const intIn = (raw, min, max) =>
+    String(raw).trim() !== "" && Number.isInteger(Number(raw)) && Number(raw) >= min && Number(raw) <= max;
+
+  function validate(v) {
+    const errors = {};
+    const clean = {};
+
+    clean.id = v.id.trim();
+    if (!clean.id) errors.id = "Enter an id, for example S001.";
+
+    clean.name = v.name;
+    const letters = v.name.replace(/ /g, "");
+    if (v.name.length < 2 || v.name.length > 50) errors.name = "Name must be 2 to 50 characters.";
+    else if (!letters || !/^\p{L}+$/u.test(letters)) errors.name = "Use letters and spaces only.";
+    else clean.name = titleCase(v.name);
+
+    if (!intIn(v.age, 1, 100)) errors.age = "Enter a whole number from 1 to 100.";
+    clean.age = Number(v.age);
+
+    if (!intIn(v.marks, 0, 100)) errors.marks = "Enter a whole number from 0 to 100.";
+    clean.marks = Number(v.marks);
+
+    clean.course = v.course.trim();
+    if (!clean.course) errors.course = "Enter a course.";
+    else if (clean.course.length > 50) errors.course = "Course can be at most 50 characters.";
+
+    clean.email = v.email.trim();
+    if (!EMAIL.test(clean.email)) errors.email = "Enter a valid email address.";
+
+    return { errors, clean };
+  }
+
+  // Only send fields that changed (the backend applies exclude_unset)
+  function diff(original, clean) {
+    const out = {};
+    ["name", "age", "marks", "course", "email"].forEach((k) => {
+      if (clean[k] !== original[k]) out[k] = clean[k];
+    });
+    return out;
+  }
+
+  return { gradeFor, gradeKey, validate, diff };
+})();
+
+/* Rollbook: state, rendering and events */
+(() => {
+  "use strict";
+
+  /* ---------- helpers ---------- */
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const esc = (s) =>
+    String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const debounce = (fn, ms) => {
+    let t;
+    return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+  };
+  const hue = (str) => [...str].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+  const initials = (name) => {
+    const w = name.trim().split(/\s+/);
+    return ((w[0] || "")[0] + (w.length > 1 ? w[w.length - 1][0] : "")).toUpperCase();
+  };
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  const { gradeFor, gradeKey } = Validation;
+  const GRADES = ["A+", "A", "B", "C", "F"];
+
+  const ICON = {
+    edit: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12.5 4.5 3 3M4 16l.7-3.3 8.8-8.8 2.6 2.6-8.8 8.8L4 16Z"/></svg>',
+    trash: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M8 6V4h4v2M6 6l.7 10h6.6L14 6"/></svg>',
+    prev: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12 5-5 5 5 5"/></svg>',
+    next: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m8 5 5 5-5 5"/></svg>',
+  };
+
+  /* ---------- state ---------- */
+  const state = {
+    course: "", sortBy: null, order: "asc", page: 1, limit: 10,
+    data: null,      // last /students page response
+    stats: null,     // summary of up to 100 students for the current course filter
+    loading: true, error: null, found: null,
+  };
+
+  const el = {
+    intro: $("#introSub"), overview: $("#overview"), found: $("#found"),
+    tbody: $("#tbody"), wrap: $("#tableWrap"), pager: $("#pager"),
+    course: $("#courseInput"), sort: $("#sortSelect"), limit: $("#limitSelect"),
+    drawer: $("#drawer"), form: $("#studentForm"), save: $("#saveBtn"), preview: $("#gradePreview"),
+    confirm: $("#confirm"), toasts: $("#toasts"), lookup: $("#lookup"), lookupInput: $("#lookupInput"),
+  };
+  const inputs = {
+    id: $("#f-id"), name: $("#f-name"), age: $("#f-age"),
+    marks: $("#f-marks"), course: $("#f-course"), email: $("#f-email"),
+  };
+
+  /* ---------- data ---------- */
+  let controller;
+
+  function summarize(res) {
+    const list = res.students;
+    const dist = Object.fromEntries(GRADES.map((g) => [g, 0]));
+    let sum = 0;
+    list.forEach((s) => { dist[gradeFor(s.marks)]++; sum += s.marks; });
+    const n = list.length;
+    return {
+      total: res.total_students, sample: n, dist,
+      avg: n ? Math.round((sum / n) * 10) / 10 : null,
+      pass: n ? Math.round(((n - dist.F) / n) * 100) : null,
+    };
+  }
+
+  async function load() {
+    if (controller) controller.abort();
+    controller = new AbortController();
+    state.loading = true;
+    state.error = null;
+    render();
+    const base = { course: state.course };
+    try {
+      const [pageRes, statsRes] = await Promise.all([
+        Api.list({ ...base, sort_by: state.sortBy, order: state.order, page: state.page, limit: state.limit }, controller.signal),
+        Api.list({ ...base, limit: 100 }, controller.signal),
+      ]);
+      if (!pageRes.students.length && pageRes.total_students > 0 && state.page > 1) {
+        state.page = Math.ceil(pageRes.total_students / state.limit); // deleted the last row of the last page
+        return load();
+      }
+      state.data = pageRes;
+      state.stats = summarize(statsRes);
+    } catch (err) {
+      if (err.name === "AbortError") return;
+      state.error = err.message;
+    }
+    state.loading = false;
+    render();
+  }
+
+  /* ---------- rendering ---------- */
+  function render() {
+    renderIntro(); renderOverview(); renderFound(); renderSortUI(); renderTable(); renderPager();
+  }
+
+  function renderIntro() {
+    const s = state.stats;
+    if (state.error && !s) el.intro.textContent = "The roll couldn't be loaded.";
+    else if (!s) el.intro.textContent = "Loading the roll…";
+    else {
+      const where = state.course ? ` enrolled in ${state.course}` : " on the roll";
+      el.intro.textContent = `${plural(s.total, "student")}${where}.`;
+    }
+  }
+
+  function renderOverview() {
+    const s = state.stats;
+    const num = (v, suffix = "") => (v === null || v === undefined ? "–" : v + suffix);
+    const bar = s && s.sample
+      ? GRADES.filter((g) => s.dist[g]).map((g) =>
+          `<i class="g-${gradeKey(g)}" style="flex:${s.dist[g]}" title="${g}: ${s.dist[g]}"></i>`).join("")
+      : "";
+    const legend = GRADES.map((g) =>
+      `<li><span class="dot g-${gradeKey(g)}"></span>${g}<b>${s ? s.dist[g] : 0}</b></li>`).join("");
+    const note = s && s.total > s.sample ? `<p class="fine muted">Based on the first ${s.sample} students.</p>` : "";
+
+    el.overview.innerHTML = `
+      <div class="stat"><span class="stat-num">${num(s && s.total)}</span><span class="muted">Students</span></div>
+      <div class="stat"><span class="stat-num">${num(s && s.avg)}</span><span class="muted">Average marks</span></div>
+      <div class="stat"><span class="stat-num">${num(s && s.pass, "%")}</span><span class="muted">Passing, 60 and above</span></div>
+      <div class="spread">
+        <span class="muted">Grade spread</span>
+        <div class="bar${bar ? "" : " empty"}" role="img" aria-label="Grade distribution">${bar}</div>
+        <ul class="legend">${legend}</ul>${note}
+      </div>`;
+  }
+
+  function renderFound() {
+    const s = state.found;
+    if (!s) { el.found.innerHTML = ""; return; }
+    const g = s.grade || gradeFor(s.marks);
+    el.found.innerHTML = `
+      <section class="found" aria-label="Lookup result">
+        <span class="avatar lg" style="--h:${hue(s.id)}">${esc(initials(s.name))}</span>
+        <div class="found-main">
+          <div class="name">${esc(s.name)} <span class="muted">· ${esc(s.id)}</span></div>
+          <div class="muted">${esc(s.course)} · age ${s.age} · ${s.marks} marks · ${esc(s.email)}</div>
+        </div>
+        <span class="grade g-${gradeKey(g)}">${esc(g)}</span>
+        <button class="btn ghost" data-found="edit" type="button">Edit</button>
+        <button class="icon-btn" data-found="dismiss" type="button" aria-label="Dismiss result">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
+        </button>
+      </section>`;
+  }
+
+  function renderSortUI() {
+    el.sort.value = state.sortBy ? `${state.sortBy}:${state.order}` : "";
+    document.querySelectorAll("th[data-th]").forEach((th) => {
+      const active = th.dataset.th === state.sortBy;
+      th.setAttribute("aria-sort", active ? (state.order === "asc" ? "ascending" : "descending") : "none");
+    });
+  }
+
+  function rowHTML(s) {
+    const g = s.grade || gradeFor(s.marks);
+    const k = gradeKey(g);
+    return `
+      <tr data-id="${esc(s.id)}">
+        <td><div class="person">
+          <span class="avatar" style="--h:${hue(s.id)}">${esc(initials(s.name))}</span>
+          <div><div class="name">${esc(s.name)}</div><div class="email">${esc(s.email)}</div></div>
+        </div></td>
+        <td class="col-id">${esc(s.id)}</td>
+        <td class="col-course">${esc(s.course)}</td>
+        <td class="col-age">${s.age}</td>
+        <td><div class="marks"><span>${s.marks}</span><span class="meter"><i class="g-${k}" style="width:${s.marks}%"></i></span></div></td>
+        <td><span class="grade g-${k}">${esc(g)}</span></td>
+        <td class="col-act"><div class="row-actions">
+          <button class="icon-btn" data-action="edit" type="button" aria-label="Edit ${esc(s.name)}">${ICON.edit}</button>
+          <button class="icon-btn danger" data-action="delete" type="button" aria-label="Delete ${esc(s.name)}">${ICON.trash}</button>
+        </div></td>
+      </tr>`;
+  }
+
+  function renderTable() {
+    el.wrap.classList.toggle("is-loading", state.loading && !!state.data);
+    if (state.error) {
+      el.tbody.innerHTML = `<tr><td colspan="7"><div class="state">
+        <h3>Couldn't load students</h3><p class="muted">${esc(state.error)}</p>
+        <button class="btn" data-action="retry" type="button">Try again</button></div></td></tr>`;
+      return;
+    }
+    if (state.loading && !state.data) {
+      el.tbody.innerHTML = Array.from({ length: Math.min(state.limit, 6) }, () =>
+        `<tr class="skel"><td><div class="person"><span class="avatar sk"></span><div class="grow"><span class="sk w60"></span><span class="sk w40"></span></div></div></td>
+         <td class="col-id"><span class="sk w40"></span></td><td class="col-course"><span class="sk w60"></span></td>
+         <td class="col-age"><span class="sk w30"></span></td><td><span class="sk w60"></span></td>
+         <td><span class="sk w40"></span></td><td></td></tr>`).join("");
+      return;
+    }
+    const list = state.data ? state.data.students : [];
+    if (!list.length) {
+      const filtered = !!state.course;
+      el.tbody.innerHTML = `<tr><td colspan="7"><div class="state">
+        <h3>${filtered ? `No students in “${esc(state.course)}”` : "No students yet"}</h3>
+        <p class="muted">${filtered ? "Check the spelling or clear the filter." : "Add the first student to start the roll."}</p>
+        <button class="btn ${filtered ? "" : "primary"}" data-action="${filtered ? "clear" : "add"}" type="button">${filtered ? "Clear filter" : "Add student"}</button>
+      </div></td></tr>`;
+      return;
+    }
+    el.tbody.innerHTML = list.map(rowHTML).join("");
+  }
+
+  function pageWindow(cur, pages) {
+    const set = new Set([1, pages, cur - 1, cur, cur + 1].filter((p) => p >= 1 && p <= pages));
+    const out = [];
+    [...set].sort((a, b) => a - b).forEach((p, i, arr) => {
+      if (i && p - arr[i - 1] > 1) out.push("gap");
+      out.push(p);
+    });
+    return out;
+  }
+
+  function renderPager() {
+    const d = state.data;
+    if (state.error || !d || !d.total_students) { el.pager.innerHTML = ""; return; }
+    const pages = Math.max(1, Math.ceil(d.total_students / d.limit));
+    const from = (d.page - 1) * d.limit + 1;
+    const to = Math.min(d.total_students, d.page * d.limit);
+    const nums = pageWindow(d.page, pages).map((p) =>
+      p === "gap" ? '<span class="gap" aria-hidden="true">…</span>'
+        : `<button type="button" class="pg${p === d.page ? " on" : ""}" data-page="${p}" ${p === d.page ? 'aria-current="page"' : ""}>${p}</button>`).join("");
+    el.pager.innerHTML = `
+      <span class="muted">Showing ${from} to ${to} of ${d.total_students}</span>
+      <div class="pages">
+        <button type="button" class="pg" data-page="${d.page - 1}" ${d.page <= 1 ? "disabled" : ""} aria-label="Previous page">${ICON.prev}</button>
+        ${nums}
+        <button type="button" class="pg" data-page="${d.page + 1}" ${d.page >= pages ? "disabled" : ""} aria-label="Next page">${ICON.next}</button>
+      </div>`;
+  }
+
+  /* ---------- toasts ---------- */
+  function toast(message, kind = "ok") {
+    const t = document.createElement("div");
+    t.className = `toast ${kind}`;
+    t.textContent = message;
+    el.toasts.appendChild(t);
+    setTimeout(() => t.remove(), 4200);
+  }
+
+  /* ---------- add / edit drawer ---------- */
+  let editing = null;
+  let submitted = false;
+
+  function showErrors(errors) {
+    Object.keys(inputs).forEach((k) => {
+      const field = $(`[data-field="${k}"]`);
+      const msg = errors[k] || "";
+      field.classList.toggle("invalid", !!msg);
+      $(".err", field).textContent = msg;
+      inputs[k].setAttribute("aria-invalid", msg ? "true" : "false");
+    });
+  }
+
+  const readForm = () => ({
+    id: editing ? editing.id : inputs.id.value,
+    name: inputs.name.value, age: inputs.age.value, marks: inputs.marks.value,
+    course: inputs.course.value, email: inputs.email.value,
+  });
+
+  function updateGradePreview() {
+    const raw = inputs.marks.value.trim();
+    const m = Number(raw);
+    const ok = raw !== "" && Number.isInteger(m) && m >= 0 && m <= 100;
+    const g = ok ? gradeFor(m) : null;
+    el.preview.textContent = g || "–";
+    el.preview.className = "grade" + (g ? ` g-${gradeKey(g)}` : "");
+  }
+
+  function openDrawer(student = null) {
+    editing = student;
+    submitted = false;
+    $("#drawerTitle").textContent = student ? `Edit ${student.name}` : "Add student";
+    el.save.textContent = student ? "Save changes" : "Create student";
+    inputs.id.value = student ? student.id : "";
+    inputs.id.disabled = !!student;
+    inputs.name.value = student ? student.name : "";
+    inputs.age.value = student ? student.age : "";
+    inputs.marks.value = student ? student.marks : "";
+    inputs.course.value = student ? student.course : "";
+    inputs.email.value = student ? student.email : "";
+    showErrors({});
+    updateGradePreview();
+    el.drawer.showModal();
+    (student ? inputs.name : inputs.id).focus();
+  }
+
+  const closeDrawer = () => el.drawer.close();
+
+  function serverFieldErrors(err) {
+    if (err.fields) return err.fields;
+    if (/email/i.test(err.message)) return { email: err.message };
+    if (/\bId\b/.test(err.message)) return { id: err.message };
+    return null;
+  }
+
+  async function onSubmit(e) {
+    e.preventDefault();
+    submitted = true;
+    const { errors, clean } = Validation.validate(readForm());
+    showErrors(errors);
+    const firstBad = Object.keys(errors)[0];
+    if (firstBad) { inputs[firstBad].focus(); return; }
+
+    el.save.disabled = true;
+    const label = el.save.textContent;
+    el.save.textContent = "Saving…";
+    try {
+      if (editing) {
+        const changes = Validation.diff(editing, clean);
+        if (!Object.keys(changes).length) { closeDrawer(); toast("No changes to save"); return; }
+        await Api.update(editing.id, changes);
+        toast(`${clean.name} updated`);
+      } else {
+        await Api.create(clean);
+        toast(`${clean.name} added`);
+      }
+      state.found = null;
+      closeDrawer();
+      load();
+    } catch (err) {
+      const fields = serverFieldErrors(err);
+      if (fields) {
+        showErrors(fields);
+        const k = Object.keys(fields).find((f) => inputs[f]);
+        if (k) inputs[k].focus();
+      }
+      toast(err.message, "error");
+    } finally {
+      el.save.disabled = false;
+      el.save.textContent = label;
+    }
+  }
+
+  /* ---------- delete ---------- */
+  async function confirmDelete(student) {
+    $("#confirmText").textContent = `${student.name} (${student.id}) will be removed from the roll. This can't be undone.`;
+    el.confirm.returnValue = "";
+    el.confirm.showModal();
+    await new Promise((r) => el.confirm.addEventListener("close", r, { once: true }));
+    if (el.confirm.returnValue !== "ok") return;
+    try {
+      await Api.remove(student.id);
+      toast(`${student.name} deleted`);
+      if (state.found && state.found.id === student.id) state.found = null;
+      load();
+    } catch (err) {
+      toast(err.message, "error");
+    }
+  }
+
+  /* ---------- events ---------- */
+  const studentById = (id) => (state.data ? state.data.students.find((s) => s.id === id) : null);
+
+  function cycleSort(field) {
+    if (state.sortBy !== field) { state.sortBy = field; state.order = "asc"; }
+    else if (state.order === "asc") state.order = "desc";
+    else { state.sortBy = null; state.order = "asc"; }
+    state.page = 1;
+    load();
+  }
+
+  function bind() {
+    $("#addBtn").addEventListener("click", () => openDrawer());
+
+    $("#themeBtn").addEventListener("click", () => {
+      const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      document.documentElement.dataset.theme = next;
+      try { localStorage.setItem("rollbook-theme", next); } catch (e) {}
+    });
+
+    el.course.addEventListener("input", debounce(() => {
+      state.course = el.course.value.trim();
+      state.page = 1;
+      load();
+    }, 300));
+
+    el.sort.addEventListener("change", () => {
+      const [by, order] = el.sort.value ? el.sort.value.split(":") : [null, "asc"];
+      state.sortBy = by; state.order = order; state.page = 1;
+      load();
+    });
+
+    el.limit.addEventListener("change", () => { state.limit = Number(el.limit.value); state.page = 1; load(); });
+
+    document.querySelector("thead").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-sort]");
+      if (b) cycleSort(b.dataset.sort);
+    });
+
+    el.tbody.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-action]");
+      if (!btn) return;
+      const row = btn.closest("tr");
+      const student = row && row.dataset.id ? studentById(row.dataset.id) : null;
+      switch (btn.dataset.action) {
+        case "edit": if (student) openDrawer(student); break;
+        case "delete": if (student) confirmDelete(student); break;
+        case "retry": load(); break;
+        case "add": openDrawer(); break;
+        case "clear": el.course.value = ""; state.course = ""; state.page = 1; load(); break;
+      }
+    });
+
+    el.pager.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-page]");
+      if (!b || b.disabled) return;
+      state.page = Number(b.dataset.page);
+      load();
+      window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    });
+
+    el.found.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-found]");
+      if (!b) return;
+      if (b.dataset.found === "edit") openDrawer(state.found);
+      else { state.found = null; renderFound(); }
+    });
+
+    el.lookup.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const id = el.lookupInput.value.trim();
+      if (!id) return;
+      try {
+        state.found = await Api.get(id);
+        renderFound();
+      } catch (err) {
+        state.found = null;
+        renderFound();
+        toast(err.message, "error");
+      }
+    });
+
+    document.addEventListener("keydown", (e) => {
+      const typing = /input|textarea|select/i.test(document.activeElement.tagName);
+      if (e.key === "/" && !typing && !document.querySelector("dialog[open]")) {
+        e.preventDefault();
+        el.lookupInput.focus();
+      }
+    });
+
+    // Drawer
+    el.form.addEventListener("submit", onSubmit);
+    el.drawer.addEventListener("click", (e) => { if (e.target === el.drawer || e.target.closest("[data-close]")) closeDrawer(); });
+    el.confirm.addEventListener("click", (e) => { if (e.target === el.confirm) el.confirm.close("cancel"); });
+    el.form.addEventListener("input", () => {
+      updateGradePreview();
+      if (submitted) showErrors(Validation.validate(readForm()).errors);
+    });
+  }
+
+  bind();
+  load();
+})();
+
+  </script>
+</body>
+</html>

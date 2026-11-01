@@ -165,7 +165,7 @@ def create_student(student : StudentCreate,
 
 
 # Part 11: PUT - update a student
-@app.put('/UpdateStudent/{student_id}', tags=["PUT ROUTES"])
+@app.put('/UpdateStudent/{student_id}', response_model=StudentResponse, tags=["PUT ROUTES"])
 def update_student(student_update : StudentUpdate,
                    student_id : str = Path(..., description="The Id of the student"),
                    db : Session = Depends(get_db)):
