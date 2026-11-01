@@ -2,9 +2,9 @@
 const Api = (() => {
   // Change this (or set window.ROLLBOOK_API_URL before this script) if the backend runs elsewhere
   const BASE = window.ROLLBOOK_API_URL ||
-  (location.hostname.endsWith("onrender.com")
-    ? "https://fastapi-and-postgres-fqmd.onrender.com"
-    : "http://127.0.0.1:8000");
+    (location.hostname.endsWith("onrender.com")
+      ? "https://fastapi-and-postgres-fqmd.onrender.com"
+      : "http://127.0.0.1:8000");
 
   class ApiError extends Error {
     constructor(message, status, fields) {
