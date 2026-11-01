@@ -1,7 +1,7 @@
 /* API layer: one function per FastAPI route in main.py */
 const Api = (() => {
   // Change this (or set window.ROLLBOOK_API_URL before this script) if the backend runs elsewhere
-  const BASE = window.ROLLBOOK_API_URL || "http://127.0.0.1:8000";
+  const BASE = window.ROLLBOOK_API_URL || "https://fastapi-and-postgres-fqmd.onrender.com";
 
   class ApiError extends Error {
     constructor(message, status, fields) {
